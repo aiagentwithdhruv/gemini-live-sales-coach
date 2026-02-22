@@ -54,6 +54,12 @@ export interface TalkRatio {
   prospect: number;
 }
 
+export interface TranscriptEntry {
+  text: string;
+  source: 'input' | 'output';
+  timestamp: number;
+}
+
 export interface DashboardState {
   isConnected: boolean;
   isCallActive: boolean;
@@ -65,7 +71,7 @@ export interface DashboardState {
   objections: Objection[];
   keyMoments: KeyMoment[];
   callDuration: number;
-  transcript: string[];
+  transcript: TranscriptEntry[];
 }
 
 export interface CallSummary {
@@ -81,19 +87,20 @@ export interface CallSummary {
 
 /** WebSocket message from client to server */
 export type ClientMessage =
-  | { type: 'audio'; data: string }  // base64 PCM
-  | { type: 'image'; data: string }  // base64 JPEG
+  | { type: 'audio'; data: string }
+  | { type: 'image'; data: string; mimeType?: string }
   | { type: 'text'; text: string }
-  | { type: 'config'; mode: CallMode; persona?: string }
+  | { type: 'config'; mode: CallMode; voice?: string; persona?: string }
   | { type: 'end' };
 
 /** WebSocket message from server to client */
 export type ServerMessage =
   | { type: 'tool_call'; name: string; args: Record<string, unknown> }
-  | { type: 'tool_result'; data: Record<string, unknown> }
+  | { type: 'tool_result'; data: Record<string, unknown> | string }
   | { type: 'text'; text: string }
-  | { type: 'audio'; data: string }
-  | { type: 'transcript'; text: string }
+  | { type: 'audio'; data: string; mimeType?: string }
+  | { type: 'transcript'; text: string; source: 'input' | 'output'; partial: boolean }
   | { type: 'turn_complete' }
+  | { type: 'usage'; prompt_tokens: number; candidates_tokens: number; total_tokens: number }
   | { type: 'status'; message: string }
   | { type: 'error'; message: string };

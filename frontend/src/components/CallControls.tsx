@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { CallMode } from '../lib/types';
 
 interface CallControlsProps {
@@ -7,10 +8,17 @@ interface CallControlsProps {
   isSharing: boolean;
   mode: CallMode;
   onConnect: () => void;
-  onStartCall: (mode: CallMode) => void;
+  onStartCall: (mode: CallMode, persona?: string) => void;
   onEndCall: () => void;
   onToggleScreenShare: () => void;
 }
+
+const PERSONAS = [
+  { id: 'sarah-startup', name: 'Sarah Chen', label: 'Easy', color: 'text-green-400' },
+  { id: 'marcus-enterprise', name: 'Marcus Williams', label: 'Medium', color: 'text-yellow-400' },
+  { id: 'david-gatekeeper', name: 'David Park', label: 'Medium', color: 'text-yellow-400' },
+  { id: 'jennifer-skeptic', name: 'Jennifer Rodriguez', label: 'Hard', color: 'text-red-400' },
+];
 
 export function CallControls({
   isConnected,
@@ -18,11 +26,12 @@ export function CallControls({
   isRecording,
   isSharing,
   mode,
-  onConnect,
   onStartCall,
   onEndCall,
   onToggleScreenShare,
 }: CallControlsProps) {
+  const [selectedPersona, setSelectedPersona] = useState('sarah-startup');
+
   return (
     <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
       <div className="flex items-center justify-between mb-4">
@@ -34,36 +43,48 @@ export function CallControls({
             className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}
           />
           <span className="text-xs text-gray-500">
-            {isConnected ? 'Connected' : 'Disconnected'}
+            {isConnected ? 'Connected' : 'Ready'}
           </span>
         </div>
       </div>
 
       <div className="space-y-3">
-        {!isConnected && (
-          <button
-            onClick={onConnect}
-            className="w-full py-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-medium transition-colors"
-          >
-            Connect to Server
-          </button>
-        )}
+        {!isCallActive && (
+          <>
+            {/* Mode buttons */}
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => onStartCall('live')}
+                className="py-3 bg-green-600 hover:bg-green-500 text-white rounded-lg font-medium transition-colors"
+              >
+                Live Coach
+              </button>
+              <button
+                onClick={() => onStartCall('practice', selectedPersona)}
+                className="py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-medium transition-colors"
+              >
+                Practice
+              </button>
+            </div>
 
-        {isConnected && !isCallActive && (
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              onClick={() => onStartCall('live')}
-              className="py-3 bg-green-600 hover:bg-green-500 text-white rounded-lg font-medium transition-colors"
-            >
-              Live Coach
-            </button>
-            <button
-              onClick={() => onStartCall('practice')}
-              className="py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-medium transition-colors"
-            >
-              Practice
-            </button>
-          </div>
+            {/* Persona selector for practice mode */}
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">
+                Practice Persona
+              </label>
+              <select
+                value={selectedPersona}
+                onChange={(e) => setSelectedPersona(e.target.value)}
+                className="w-full bg-gray-800 border border-gray-700 text-gray-300 rounded-lg px-3 py-2 text-sm"
+              >
+                {PERSONAS.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} ({p.label})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </>
         )}
 
         {isCallActive && (

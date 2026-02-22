@@ -6,6 +6,7 @@ import type {
   Sentiment,
   ServerMessage,
   CallMode,
+  TranscriptEntry,
 } from '../lib/types';
 
 const initialState: DashboardState = {
@@ -106,10 +107,16 @@ export function useCallMetrics() {
       }
     }
 
-    if (msg.type === 'transcript') {
+    // Transcriptions — only add finalized (non-partial) entries
+    if (msg.type === 'transcript' && !msg.partial && msg.text.trim()) {
+      const entry: TranscriptEntry = {
+        text: msg.text,
+        source: msg.source,
+        timestamp: Date.now() / 1000,
+      };
       setState((s) => ({
         ...s,
-        transcript: [...s.transcript, msg.text],
+        transcript: [...s.transcript, entry],
       }));
     }
   }, []);

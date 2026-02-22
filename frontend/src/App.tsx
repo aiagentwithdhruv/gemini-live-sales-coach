@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useAudioStream } from './hooks/useAudioStream';
+import { useAudioPlayback } from './hooks/useAudioPlayback';
 import { useScreenShare } from './hooks/useScreenShare';
 import { useCallMetrics } from './hooks/useCallMetrics';
 import { CallControls } from './components/CallControls';
@@ -9,14 +10,30 @@ import { ScoreCard } from './components/ScoreCard';
 import { ObjectionTracker } from './components/ObjectionTracker';
 import { SentimentGauge } from './components/SentimentGauge';
 import { KeyMoments } from './components/KeyMoments';
-import type { CallMode } from './lib/types';
+import { TranscriptPanel } from './components/TranscriptPanel';
+import type { CallMode, ServerMessage } from './lib/types';
 
 function App() {
   const { state, startCall, endCall, setConnected, handleServerMessage } =
     useCallMetrics();
 
-  const { isConnected, connect, send } = useWebSocket({
-    onMessage: handleServerMessage,
+  const { playChunk, stop: stopPlayback } = useAudioPlayback();
+
+  // Handle server messages — both metrics + audio playback
+  const onServerMessage = useCallback(
+    (msg: ServerMessage) => {
+      // Play audio chunks in practice mode
+      if (msg.type === 'audio' && msg.data) {
+        playChunk(msg.data);
+      }
+      // Forward all messages to metrics handler
+      handleServerMessage(msg);
+    },
+    [handleServerMessage, playChunk]
+  );
+
+  const { isConnected, connect, disconnect, send } = useWebSocket({
+    onMessage: onServerMessage,
     onConnect: () => setConnected(true),
     onDisconnect: () => setConnected(false),
   });
@@ -25,33 +42,30 @@ function App() {
   const { isSharing, startSharing, stopSharing } = useScreenShare();
 
   const handleStartCall = useCallback(
-    async (mode: CallMode) => {
+    async (mode: CallMode, persona?: string) => {
       startCall(mode);
-      send({ type: 'config', mode });
 
-      // Start audio capture
+      // Connect WebSocket with config as the first message
+      // (server expects config as the initial frame to select agent + mode)
+      connect({ type: 'config', mode, persona });
+
+      // Start audio capture — stream mic audio to the server
       await startRecording((base64) => {
         send({ type: 'audio', data: base64 });
       });
-
-      // Send initial coaching prompt
-      send({
-        type: 'text',
-        text:
-          mode === 'live'
-            ? 'A live sales call is starting. Listen to the audio and provide real-time coaching. Start by sending an initial dashboard update with a welcome message.'
-            : 'A practice sales session is starting. The user will role-play a sales call. Coach them in real-time.',
-      });
     },
-    [startCall, startRecording, send]
+    [connect, startCall, startRecording, send]
   );
 
   const handleEndCall = useCallback(() => {
     stopRecording();
     stopSharing();
+    stopPlayback();
     send({ type: 'end' });
+    // Short delay then disconnect (give server time for call summary)
+    setTimeout(() => disconnect(), 2000);
     endCall();
-  }, [stopRecording, stopSharing, send, endCall]);
+  }, [stopRecording, stopSharing, stopPlayback, send, disconnect, endCall]);
 
   const handleToggleScreenShare = useCallback(async () => {
     if (isSharing) {
@@ -108,9 +122,10 @@ function App() {
       {/* Main Dashboard */}
       <main className="max-w-7xl mx-auto px-4 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column -- Coaching */}
+          {/* Left Column -- Coaching + Transcript */}
           <div className="lg:col-span-2 space-y-6">
             <CoachingPanel tips={state.coachingTips} />
+            <TranscriptPanel entries={state.transcript} />
             <ObjectionTracker objections={state.objections} />
             <KeyMoments moments={state.keyMoments} />
           </div>
